@@ -6,9 +6,16 @@ import h5py
 import simplejson as json
 from tqdm import tqdm
 import torchvision
-default_data_path = '/ssd/esm1g14/OpportunityUCIDataset/'
+from scipy import stats
+
 import torch
 from torch.utils.data.sampler import Sampler
+import scipy.io as io
+import _pickle as pickle
+import pandas as pd
+
+default_data_path = '/ssd/esm1g14/OpportunityUCIDataset/'
+default_data_path_skoda = '/ssd/esm1g14/SkodaMiniCP/'
 
 class OpportunityDataset():
     def __init__(self, datapath=default_data_path,dataset='training',transform=None,target_transform=None,window_size=None):
@@ -84,7 +91,7 @@ class OpportunityDataset():
     def _read_opp_files(self, filelist, cols, label2id):
         data = []
         labels = []
-        print('LOADING %s DATA')%(self.dataset)
+        print(('LOADING %s DATA')%(self.dataset))
         filelist = tqdm(filelist)
         for i, filename in enumerate(filelist):
             nancnt = 0
@@ -134,6 +141,64 @@ class OpportunityDataset():
             class_count[i] = len(np.where(self.data['targets'] == i)[0])
         weights = (1 / torch.from_numpy(class_count).type(torch.DoubleTensor))
         return weights
+class SkodaDataset():
+    def __init__(self,path=default_data_path_skoda,dataset='training',transform=None,target_transform=None,window_size=30,overlap=0.5):
+        self.path = path
+        self.window_size = window_size
+        self.overlap = overlap
+        self.overlay = int(window_size*overlap)
+        if not os.path.isfile(self.path + 'full_preprocessed.txt'):
+            self.load_set()
+            self.merge_hands()
+        self.data = pickle.load(open(self.path + 'full_preprocessed.txt','r'))
+    def load_set(self):
+        def sliding_window(dataset, window_size, overlay):
+            activity = dataset[:,0].reshape(dataset.shape[0],1)
+            #delete sensor id -> not important
+            dataset = np.delete(dataset,[0,1,8,15,22,29,36,43,50,57,64],1)
+            activity_data = []
+            data = []
+            for i in range(0, dataset.shape[0] - self.window_size + 1, self.window_size - self.overlay):
+                temp_data = dataset[i:i + self.window_size, :]
+                activity_data += [stats.mode(activity[i:i + self.window_size])[0]]
+                data += [temp_data.reshape(1, temp_data.shape[0] * temp_data.shape[1])]
+            activity_data = np.concatenate(activity_data,axis=0)
+            data = np.concatenate(data,axis=0)
+            data = np.concatenate((activity_data, data), axis = 1)
+            return data
+        arms = ['left', 'right']
+        for i,arm in enumerate(arms):
+            print(('Processing ' + arm + ' arm sensors'))
+            raw_data = io.loadmat(self.path+ arm +'_classall_clean.mat')[arm + '_classall_clean']
+            raw_data = sliding_window(raw_data, self.window_size, self.overlay)
+            #append labels
+            raw_data = np.insert(raw_data, 1, 1, axis = 1) #trial
+            len_raw = raw_data.shape[0]
+            raw_data = np.concatenate((np.repeat([[i]], len_raw, axis=0), raw_data), axis = 1)
+            # dump that pickle
+            pickle.dump(raw_data, open(self.path + arm + '_arm_preprocessed.txt' ,'wb'), pickle.HIGHEST_PROTOCOL)
+
+    def merge_hands(self):
+        names = ['_accX','_accY','_accZ','_acc_rawX','_acc_rawY','_acc_rawZ',]
+        raw = [ str(j) + '_i' + str(i) + cols for j in range(1, self.window_size + 1) for i in range(1, 11) for cols in names]
+        columns = ['Activity', 'Trial']
+        columns.extend(raw)
+        arms = ['left', 'right']
+        data = []
+        for arm in arms:
+            data += [pickle.load(open(self.path + arm + '_arm_preprocessed.txt' ,'rb'))]
+        data = np.concatenate(data,axis=0)
+        data = pd.DataFrame(data[:,1:], index = data[:,0], columns = columns)
+        data.index.name = 'Arm'
+        data.replace(['na','nan','NaN', 'NaT','inf','-inf','nan'], np.nan, inplace = True)
+        data = data.dropna()
+        pickle.dump(data, open(self.path+'full_preprocessed.txt' ,'wb'), pickle.HIGHEST_PROTOCOL)
+
+    def __getitem__(self):
+        pass
+    def __len__(self):
+        pass
+
 class BalancedBatchSampler(Sampler):
     def __init__(self, labels):
         self.labels = labels
