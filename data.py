@@ -7,14 +7,13 @@ import simplejson as json
 from tqdm import tqdm
 import torchvision
 from scipy import stats
-
 import torch
 from torch.utils.data.sampler import Sampler
 import scipy.io as io
 import _pickle as pickle
 import pandas as pd
 
-default_data_path = '/ssd/esm1g14/OpportunityUCIDataset/'
+default_data_path = '/scratch/esm1g14/OpportunityUCIDataset/'
 default_data_path_skoda = '/ssd/esm1g14/SkodaMiniCP/'
 
 class OpportunityDataset():
@@ -88,11 +87,12 @@ class OpportunityDataset():
         self._read_opp_files(files[self.dataset], cols, label2id)
         self.id2label = id2label
         self.label2id = label2id
-    def _read_opp_files(self, filelist, cols, label2id):
+    def _read_opp_files(self, filelist, cols, label2id,verbose=False):
         data = []
         labels = []
         print(('LOADING %s DATA')%(self.dataset))
-        filelist = tqdm(filelist)
+        if verbose:
+            filelist = tqdm(filelist)
         for i, filename in enumerate(filelist):
             nancnt = 0
             # print('reading file %d of %d' % (i+1, len(filelist)))
@@ -119,9 +119,9 @@ class OpportunityDataset():
         max_len = np.floor(len(self.data['inputs'])/(overlap*window_size)).astype(int)
         for i in range(max_len-1):
             inputs += [self.data['inputs'][counter:window_size+counter,:]]
-            targets += [self.data['targets'][int(window_size+counter)]]
+            targets += [stats.mode(self.data['targets'][counter:window_size+counter],axis=None).mode[0]]
             counter += int(len(inputs[-1])*overlap)
-        self.data = {'inputs': np.asarray(inputs), 'targets': np.asarray(targets, dtype=int)}
+        self.data = {'inputs': np.asarray(inputs).transpose(0,2,1), 'targets': np.asarray(targets, dtype=int)}
     def __getitem__(self,index):
         x,y = self.data['inputs'][index],self.data['targets'][index].reshape(1,-1)
         if self.transform:

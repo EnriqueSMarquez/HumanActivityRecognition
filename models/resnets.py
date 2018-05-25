@@ -43,20 +43,23 @@ class Bottleneck1D(nn.Module):
 
 class ResNet1D(nn.Module):
 
-    def __init__(self, block, layers, kernel_size=3,input_channels=1):
+    def __init__(self, block, layers, kernel_size=3,input_channels=1,return_multiple_outputs=False,first_channels=64):
         self.inplanes = 16
         self.expansion = block.expansion
+        self.return_multiple_outputs = return_multiple_outputs
         self.kernel_size = kernel_size
         super(ResNet1D, self).__init__()
         self.conv1 = nn.Conv1d(input_channels, 16, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
         self.bn1 = nn.BatchNorm1d(16)
         self.relu = nn.ReLU(inplace=True)
         # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0]) #32
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)#16
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)#8
-        # self.layer4 = self._make_layer(block, 512, layers[3], stride=2)#4
-        self.bn2 = nn.BatchNorm1d(256*block.expansion)
+        mid_layers = []
+        mid_layers += self._make_layer(block, 64, layers[0]) #32
+        channels = first_channels
+        for layer in layers[1::]:
+            channels *= 2
+            mid_layers += self._make_layer(block, channels, layer, stride=2)#16
+        self.layers = nn.ModuleList(mid_layers)
         self.init_weights()
 
     def init_weights(self):
@@ -88,34 +91,73 @@ class ResNet1D(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        # x = self.bn1(x)
-        # x = self.relu(x)
-        # x = self.maxpool(x)
+        outputs = []
+        for layer in self.layers:
+            outputs += [layer(x)]
+            x = outputs[-1]
+        if self.return_multiple_outputs:
+            return outputs
+        else:
+            return outputs[-1]
 
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        # x = self.layer4(x)
-        x = self.bn2(x)
-        x = self.relu(x)
-
-        return x
-
-def resnet_encoder(depth,block=Bottleneck1D,kernel_size=3,input_channels=1):
-    n=int((depth-2)/9)
-    model = ResNet1D(block, [n, n, n, n],kernel_size=kernel_size,input_channels=input_channels)
+def resnet_encoder(depth,block=Bottleneck1D,kernel_size=3,input_channels=1,return_multiple_outputs=False):
+    model = ResNet1D(block, depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=return_multiple_outputs)
     return model
 
-
-class HAR_ResNet1D(nn.Module):
-    def __init__(self,depth=56,kernel_size=3,input_channels=30,nb_classes=18):
-        super(HAR_ResNet1D,self).__init__()
-        self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels)
-        self.last_compression = nn.Conv1d(256*self.encoder.expansion, 16, kernel_size=kernel_size, stride=1, padding=(kernel_size-1)/2)
+class HAR_ResNet1D_AuxOuts(nn.Module):
+    def __init__(self,depth=56,kernel_size=3,input_channels=30,nb_classes=18,outputs=3):
+        super(HAR_ResNet1D_AuxOuts,self).__init__()
+        self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=True)
+        #INCREASE 16, ADD AVERGA POOLING LAYER
+        self.last_compressions = [nn.Sequential(nn.BatchNorm1d(int(256*self.encoder.expansion/2**i)),nn.ReLU(),nn.Conv1d(int(256*self.encoder.expansion/2**i), 16, kernel_size=kernel_size, stride=1, padding=int(kernel_size-1)/2),
+                                                    nn.BatchNorm1d(16), nn.ReLU()) for i in range(outputs)]
+        self.last_compressions = nn.ModuleList(self.last_compressions)
         self.nb_classes = nb_classes
     def init_weights(self):
         self.encoder.init_weights()
-        kaiming_normal_(self.last_compression.weight.data)
+        for compression_container,classifier in zip(self.last_compressions,self.classifiers):
+            for m in compression_container.modules():
+                if isinstance(m, nn.Conv1d):
+                    kaiming_normal_(m.weight.data)
+                elif isinstance(m, nn.BatchNorm1d):
+                    m.weight.data.fill_(1)
+                    m.bias.data.zero_()
+            if isinstance(classifier, nn.Linear):
+                kaiming_normal_(classifier.weight.data)
+    def build_classifier(self,x):
+        x = self.encoder(x)
+        self.classifiers = []
+        for compression_layer,xx in zip(self.last_compressions,x):
+            xx = compression_layer(xx)
+            xx = xx.view(xx.size(0),-1)
+            self.classifiers += [nn.Linear(xx.size(1),self.nb_classes)]
+        self.classifiers = nn.ModuleList(self.classifiers)
+        self.init_weights()
+    def forward(self,x):
+        x = self.encoder(x)
+        outputs = []
+        for xx,compression,classifier in zip(x,self.last_compressions,self.classifiers):
+            xx = compression(xx)
+            xx = xx.view(xx.size(0),-1)
+            outputs += [classifier(xx)]
+        return outputs
+
+
+class HAR_ResNet1D(nn.Module):
+    def __init__(self,depth=[5,5,5,5],kernel_size=5,input_channels=30,nb_classes=18):
+        super(HAR_ResNet1D,self).__init__()
+        self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels)
+        self.last_compression = nn.Sequential(nn.BatchNorm1d(int(self.encoder.layers[-1].conv3.out_channels)),nn.ReLU(),
+                                              nn.Conv1d(int(self.encoder.layers[-1].conv3.out_channels), 32, kernel_size=kernel_size, stride=1, padding=int(kernel_size-1)/2))
+        self.nb_classes = nb_classes
+    def init_weights(self):
+        self.encoder.init_weights()
+        for m in self.last_compression.modules():
+            if isinstance(m, nn.Conv1d):
+                kaiming_normal_(m.weight.data)
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
         kaiming_normal_(self.classifier.weight.data)
     def build_classifier(self,x):
         x = self.encoder(x)
@@ -128,4 +170,4 @@ class HAR_ResNet1D(nn.Module):
         x = self.last_compression(x)
         x = x.view(x.size(0),-1)
         x = self.classifier(x)
-        return x
+        return [x]

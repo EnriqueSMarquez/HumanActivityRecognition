@@ -714,15 +714,15 @@ class MSDNet(nn.Module):
         return outputs
 def HAR_MSDNet(in_channels=30,num_classes=18):
     args = type('', (), {})()
-    args.msd_base = 1
+    args.msd_base = 2
     args.msd_stepmode = 'even'
-    args.msd_step = 1
-    args.msd_blocks = 3
+    args.msd_step = 9
+    args.msd_blocks = 15
     args.reduction = 0.5
-    args.msd_growth = 6
-    args.msd_growth_factor = [1,2,4,4]
+    args.msd_growth = 9
+    args.msd_growth_factor = [1,2,4,4,4]
     args.msd_bottleneck = True
-    args.msd_bottleneck_factor = [1,2,4,4]
+    args.msd_bottleneck_factor = [1,2,4,4,4]
     args.msd_prune = 'max'
     args.num_channels = 32
     args.msd_all_gcn = False
