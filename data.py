@@ -119,7 +119,8 @@ class OpportunityDataset():
         max_len = np.floor(len(self.data['inputs'])/(overlap*window_size)).astype(int)
         for i in range(max_len-1):
             inputs += [self.data['inputs'][counter:window_size+counter,:]]
-            targets += [stats.mode(self.data['targets'][counter:window_size+counter],axis=None).mode[0]]
+            # targets += [stats.mode(self.data['targets'][counter:window_size+counter],axis=None).mode[0]]
+            targets += [self.data['targets'][window_size+counter]]
             counter += int(len(inputs[-1])*overlap)
         self.data = {'inputs': np.asarray(inputs).transpose(0,2,1), 'targets': np.asarray(targets, dtype=int)}
     def __getitem__(self,index):
