@@ -10,12 +10,12 @@ import numpy as np
 class BasicBlock1d(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None,kernel_size=3):
+    def __init__(self, inplanes, planes, stride=1, downsample=None,kernel_size=3,dilation=1):
         super(BasicBlock1d, self).__init__()
-        self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=kernel_size,padding=(kernel_size-1)/2,stride=stride)
+        self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=kernel_size,padding=(kernel_size-1)/2,stride=stride,dilation=dilation)
         self.bn1 = nn.BatchNorm1d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv1d(planes, planes,kernel_size=kernel_size,padding=(kernel_size-1)/2)
+        self.conv2 = nn.Conv1d(planes, planes,kernel_size=kernel_size,padding=(kernel_size-1)/2,dilation=dilation)
         self.bn2 = nn.BatchNorm1d(planes)
         self.downsample = downsample
         self.stride = stride
@@ -116,7 +116,7 @@ class ResNet1D(nn.Module):
         layers.append(block(self.inplanes, planes, stride, downsample,kernel_size=self.kernel_size))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
+            layers.append(block(self.inplanes, planes,kernel_size=self.kernel_size))
 
         return nn.Sequential(*layers)
 
@@ -131,8 +131,61 @@ class ResNet1D(nn.Module):
         else:
             return outputs[-1]
 
-def resnet_encoder(depth,block=BasicBlock1d,kernel_size=3,input_channels=1,return_multiple_outputs=False):
-    model = ResNet1D(block, depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=return_multiple_outputs)
+
+class Dilated_ResNet1D(nn.Module):
+
+    def __init__(self, block, layers, kernel_size=3,input_channels=1,return_multiple_outputs=False,first_channels=64):
+        self.inplanes = 64
+        self.expansion = block.expansion
+        self.return_multiple_outputs = return_multiple_outputs
+        self.kernel_size = kernel_size
+        super(ResNet1D, self).__init__()
+        self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
+        self.bn1 = nn.BatchNorm1d(64)
+        self.relu = nn.ReLU(inplace=True)
+        # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
+        mid_layers = []
+        mid_layers += self._make_layer(block, 64, layers[0],dilation=1) #32
+        channels = first_channels*2
+        dilation = 1
+        for layer in layers[1::]:
+            mid_layers += self._make_layer(block, channels, layer,dilation=dilation)#16
+            self.inplanes = channels
+            channels *= 2
+            dilation *= 2
+        self.layers = nn.ModuleList(mid_layers)
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d) or isinstance(m, nn.Linear):
+                kaiming_normal_(m.weight.data)
+            elif isinstance(m, nn.BatchNorm1d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+
+    def _make_layer(self, block, planes, blocks, stride=1,dilation=1):
+        layers = []
+        for i in range(0, blocks):
+            layers.append(block(self.inplanes, planes,kernel_size=self.kernel_size,dilation=dilation))
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        outputs = []
+        for layer in self.layers:
+            outputs += [layer(x)]
+            x = outputs[-1]
+        if self.return_multiple_outputs:
+            return outputs
+        else:
+            return outputs[-1]
+
+def resnet_encoder(depth,block=BasicBlock1d,kernel_size=3,input_channels=1,return_multiple_outputs=False,dilated=False):
+    if not dilated:
+        model = ResNet1D(block, depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=return_multiple_outputs)
+    else:
+        model = Dilated_ResNet1D(block, depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=return_multiple_outputs)
     return model
 
 class HAR_ResNet1D_AuxOuts(nn.Module):
@@ -174,9 +227,9 @@ class HAR_ResNet1D_AuxOuts(nn.Module):
 
 
 class HAR_ResNet1D(nn.Module):
-    def __init__(self,depth=[5,5,5,5],kernel_size=5,input_channels=30,nb_classes=18):
+    def __init__(self,depth=[5,5,5,5],kernel_size=5,input_channels=30,nb_classes=18,dilated=False):
         super(HAR_ResNet1D,self).__init__()
-        self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels)
+        self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels,dilated=dilated)
         self.last_compression = nn.Sequential(nn.BatchNorm1d(int(self.encoder.layers[-1].conv2.out_channels)),nn.ReLU())
         self.nb_classes = nb_classes
     def init_weights(self):
