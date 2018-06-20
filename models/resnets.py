@@ -12,10 +12,10 @@ class BasicBlock1d(nn.Module):
 
     def __init__(self, inplanes, planes, stride=1, downsample=None,kernel_size=3,dilation=1):
         super(BasicBlock1d, self).__init__()
-        self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=kernel_size,padding=(kernel_size-1)/2,stride=stride,dilation=dilation)
+        self.conv1 = nn.Conv1d(inplanes, planes, kernel_size=kernel_size,padding=dilation*(kernel_size-1)/2,stride=stride,dilation=dilation)
         self.bn1 = nn.BatchNorm1d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv1d(planes, planes,kernel_size=kernel_size,padding=(kernel_size-1)/2,dilation=dilation)
+        self.conv2 = nn.Conv1d(planes, planes,kernel_size=kernel_size,padding=dilation*(kernel_size-1)/2,dilation=dilation)
         self.bn2 = nn.BatchNorm1d(planes)
         self.downsample = downsample
         self.stride = stride
@@ -75,7 +75,7 @@ class Bottleneck1D(nn.Module):
 class ResNet1D(nn.Module):
 
     def __init__(self, block, layers, kernel_size=3,input_channels=1,return_multiple_outputs=False,first_channels=64):
-        self.inplanes = 64
+        self.inplanes = first_channels
         self.expansion = block.expansion
         self.return_multiple_outputs = return_multiple_outputs
         self.kernel_size = kernel_size
@@ -133,24 +133,22 @@ class ResNet1D(nn.Module):
 
 
 class Dilated_ResNet1D(nn.Module):
-
     def __init__(self, block, layers, kernel_size=3,input_channels=1,return_multiple_outputs=False,first_channels=64):
-        self.inplanes = 64
+        self.inplanes = first_channels
+        channels = 64
         self.expansion = block.expansion
         self.return_multiple_outputs = return_multiple_outputs
         self.kernel_size = kernel_size
-        super(ResNet1D, self).__init__()
-        self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
-        self.bn1 = nn.BatchNorm1d(64)
+        super(Dilated_ResNet1D, self).__init__()
+        self.conv1 = nn.Conv1d(input_channels, channels, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
+        self.bn1 = nn.BatchNorm1d(channels)
         self.relu = nn.ReLU(inplace=True)
         # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
         mid_layers = []
-        mid_layers += self._make_layer(block, 64, layers[0],dilation=1) #32
-        channels = first_channels*2
+        mid_layers += self._make_layer(block, channels, layers[0],dilation=1) #32
         dilation = 1
         for layer in layers[1::]:
             mid_layers += self._make_layer(block, channels, layer,dilation=dilation)#16
-            self.inplanes = channels
             channels *= 2
             dilation *= 2
         self.layers = nn.ModuleList(mid_layers)
@@ -166,8 +164,11 @@ class Dilated_ResNet1D(nn.Module):
 
     def _make_layer(self, block, planes, blocks, stride=1,dilation=1):
         layers = []
-        for i in range(0, blocks):
-            layers.append(block(self.inplanes, planes,kernel_size=self.kernel_size,dilation=dilation))
+        downsample = nn.Conv1d(self.inplanes,planes,kernel_size=1)
+        layers.append(block(self.inplanes, planes,kernel_size=self.kernel_size,dilation=dilation,downsample=downsample))
+        for i in range(1, blocks):
+            layers.append(block(planes, planes,kernel_size=self.kernel_size,dilation=dilation))
+        self.inplanes = planes
         return nn.Sequential(*layers)
 
     def forward(self, x):

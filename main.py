@@ -30,7 +30,7 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run2_pamp2_dilated/'
+saving_folder = './Run2_pamp2_not_dilated/'
 if not os.path.isdir(saving_folder):
     os.mkdir(saving_folder)
 # k1 = int(args.parallel_index1)
@@ -71,7 +71,7 @@ testing_loader = torch.utils.data.DataLoader(  dataset=test_data,
 # saving_folder = saving_folder + str(sum(depth)) + '_' + str(kernel_size) +'/'
 # if not os.path.isdir(saving_folder):
 #     os.mkdir(saving_folder)
-model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=kernel_size,depth=[3,4,4,4],dilated=True)
+model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=15,depth=[3,4,4,4],dilated=False)
 x = Variable(next(iter(training_loader))[0])
 print('Batch shape')
 print(x.shape)
