@@ -22,8 +22,15 @@ class Trainer():
                         'test_f1' : []} for i in range(nb_outputs)]
         self.saving_folder = saving_folder
         self.save_best = save_best
-    def train(self,nb_epochs,drop_learning_rate=[]):
+    def cross_validate_training(self,nb_epochs,drop_learning_rate=[],nb_files=None):
+        if nb_files == None:
+            nb_files = len(self.training_loader.files)
+        for cross_validation_index in range(nb_files):
+            self.training_loader.read_data
+    def train(self,nb_epochs,drop_learning_rate=[],window_size=90,step=10):
         print(('TRAINING MODEL WITH EPOCHS %d')%(nb_epochs))
+        self.training_loader.dataset.build_data(window_size,step)
+        self.test_loader.dataset.build_data(window_size,step)
         best_loss = 100.
         starting_epoch = len(self.histories[0]['test_loss'])
         for epoch in range(starting_epoch,nb_epochs):

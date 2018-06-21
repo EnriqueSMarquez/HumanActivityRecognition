@@ -9,17 +9,18 @@ import copy
 from scipy import stats
 from .dataset import HAR_dataset
 
-default_path = '/scratch/esm1g14/PAMAP2/'
+default_path = '/ssd/esm1g14/PAMAP2/'
 
 class PAMAP2_Dataset(HAR_dataset):
     def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
         super(PAMAP2_Dataset,self).__init__(datapath=datapath,dataset=dataset,transform=transform,target_transform=target_transform)
-        self.read_data()
-    def read_data(self):
+        self.files = ['subject101.dat', 'subject102.dat','subject103.dat','subject104.dat', 'subject107.dat', 'subject108.dat', 'subject109.dat','subject106.dat']
+    def read_data(self,cross_validation_index=-1):
+        files = self.files
         if self.dataset == 'training':
-            files = ['subject101.dat', 'subject102.dat','subject103.dat','subject104.dat', 'subject107.dat', 'subject108.dat', 'subject109.dat']
+            files.pop(cross_validation_index)
         else:
-            files = ['subject106.dat']
+            files = [files.pop(cross_validation_index)]
         label_map = [
             # (0, 'other'),
             (1, 'lying'),
