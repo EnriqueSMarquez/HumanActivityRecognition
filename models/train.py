@@ -22,15 +22,18 @@ class Trainer():
                         'test_f1' : []} for i in range(nb_outputs)]
         self.saving_folder = saving_folder
         self.save_best = save_best
-    def cross_validate_training(self,nb_epochs,drop_learning_rate=[],nb_files=None):
+    def cross_validate_training(self,nb_epochs,drop_learning_rate=[],nb_files=None,window_size=90,step=10):
         if nb_files == None:
-            nb_files = len(self.training_loader.files)
+            nb_files = len(self.training_loader.dataset.files)
         for cross_validation_index in range(nb_files):
-            self.training_loader.read_data
-    def train(self,nb_epochs,drop_learning_rate=[],window_size=90,step=10):
+            print(('TRAINING CROSSVALIDATION INDEX %d')%(cross_validation_index))
+            self.training_loader.dataset.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
+            self.test_loader.dataset.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
+            self.model.init_weights()
+            self.reset_history()
+            self.train(nb_epochs=nb_epochs,drop_learning_rate=drop_learning_rate,name='_index'+str(cross_validation_index))
+    def train(self,nb_epochs,drop_learning_rate=[],name=''):
         print(('TRAINING MODEL WITH EPOCHS %d')%(nb_epochs))
-        self.training_loader.dataset.build_data(window_size,step)
-        self.test_loader.dataset.build_data(window_size,step)
         best_loss = 100.
         starting_epoch = len(self.histories[0]['test_loss'])
         for epoch in range(starting_epoch,nb_epochs):
@@ -58,8 +61,8 @@ class Trainer():
                 print(('TRAINING ACC : %.4f')%(history['train_acc'][-1]))
                 print(('TESTING ACC : %.4f')%(history['test_acc'][-1]))
                 print(('TESTING F1 : %.4f')%(history['test_f1'][-1]))
-            self.save_history()
-            self.save_model()
+            self.save_history(name=name)
+            # self.save_model(name=name)
             if self.save_best and best_loss > self.history['test_loss'][-1]:
                 self.save_model('best_')
     def train_epoch(self):
@@ -123,9 +126,15 @@ class Trainer():
                         predict.cpu().numpy().reshape(-1),average='weighted')
                for predict in predicts]
         return losses,corrects,f1s
-    def save_history(self):
-        print(('SAVING HISTORY AT %s')%(self.saving_folder + 'history.txt'))
-        with open(self.saving_folder + 'history.txt','wb') as fp:
+    def save_history(self,name=''):
+        print(('SAVING HISTORY AT %s')%(self.saving_folder + 'history' + name + '.txt'))
+        with open(self.saving_folder + 'history' + name + '.txt','wb') as fp:
             pickle.dump(self.histories,fp)
     def save_model(self,name=''):
-        torch.save(self.model.state_dict(),self.saving_folder+name+'model.pth.tar')
+        torch.save(self.model.state_dict(),self.saving_folder+'model' + name + '.pth.tar')
+    def reset_history(self):
+        self.histories = [{'test_acc'  : [],
+                        'train_acc'  : [],
+                        'test_loss' : [],
+                        'train_loss' : [],
+                        'test_f1' : []} for i in range(self.nb_outputs)]

@@ -16,7 +16,7 @@ class PAMAP2_Dataset(HAR_dataset):
         super(PAMAP2_Dataset,self).__init__(datapath=datapath,dataset=dataset,transform=transform,target_transform=target_transform)
         self.files = ['subject101.dat', 'subject102.dat','subject103.dat','subject104.dat', 'subject107.dat', 'subject108.dat', 'subject109.dat','subject106.dat']
     def read_data(self,cross_validation_index=-1):
-        files = self.files
+        files = self.files.copy()
         if self.dataset == 'training':
             files.pop(cross_validation_index)
         else:

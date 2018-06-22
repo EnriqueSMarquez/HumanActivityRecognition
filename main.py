@@ -30,7 +30,8 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run4_pamp2_not_dilated/'
+saving_folder = './Run2_pamp2_CV_not_dilated/'
+print(saving_folder)
 if not os.path.isdir(saving_folder):
     os.mkdir(saving_folder)
 # k1 = int(args.parallel_index1)
@@ -71,7 +72,7 @@ testing_loader = torch.utils.data.DataLoader(  dataset=test_data,
 # saving_folder = saving_folder + str(sum(depth)) + '_' + str(kernel_size) +'/'
 # if not os.path.isdir(saving_folder):
 #     os.mkdir(saving_folder)
-model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=15,depth=[3,4,4],dilated=False)
+model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=15,depth=[3,4,4,5],dilated=False)
 x = Variable(next(iter(training_loader))[0])
 print('Batch shape')
 print(x.shape)
@@ -85,5 +86,5 @@ optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,nesterov=True
 criterion = nn.CrossEntropyLoss()
 trainer = train.Trainer(model,training_loader,optimizer,criterion,test_loader=testing_loader,
                         verbose=False,saving_folder=saving_folder,nb_outputs=1)
-trainer.train(500,drop_learning_rate=[10,50,100,200],window_size=90,step=10)
+trainer.cross_validate_training(400,drop_learning_rate=[10,50,100,200],window_size=90,step=10)
 print(saving_folder)
