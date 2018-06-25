@@ -12,9 +12,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--dataset', type=str, default='opp')
 # parser.add_argument('--max_scale',type=int,default=0)
 # parser.add_argument('--parallel_index1',type=int)
+parser.add_argument('--cross_validation_index',type=int)
 # parser.add_argument('--parallel_index2',type=int)
 args = parser.parse_args()
 dataset = args.dataset
+cross_validation_index = int(args.cross_validation_index)
 if dataset == 'opp':
     from data import opportunity
     dataset = opportunity.OpportunityDataset
@@ -30,7 +32,7 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run2_pamp2_CV_not_dilated/'
+saving_folder = './Run4_pamp2_CV_not_dilated/'
 print(saving_folder)
 if not os.path.isdir(saving_folder):
     os.mkdir(saving_folder)
@@ -41,8 +43,8 @@ target_transform = quick_transforms(type=torch.LongTensor)
 training_data = dataset(dataset='training',transform=input_transform,
                                         target_transform=target_transform)
 test_data = dataset(dataset='test',transform=input_transform,target_transform=target_transform)
-training_data.build_data(window_size=90,step=10)
-# test_data.build_data(window_size=90,step=10)
+training_data.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
+test_data.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
 # training_sampler = data.BalancedBatchSampler(labels=training_data.data['targets'])
 
 
@@ -55,7 +57,7 @@ training_loader = torch.utils.data.DataLoader(  dataset=training_data,
                                             # sampler=training_sampler)
 testing_loader = torch.utils.data.DataLoader(  dataset=test_data,
                                             batch_size=32,  # specified batch size here
-                                            shuffle=True,
+                                            shuffle=False,
                                             num_workers=2,
                                             drop_last=True,  # drop the last batch that cannot be divided by batch_size
                                             pin_memory=True)
@@ -66,9 +68,9 @@ testing_loader = torch.utils.data.DataLoader(  dataset=test_data,
 # kernel_sizes,depth_indexs = utils.make_grid(kernel_sizes,depth_indexs)
 # kernel_size = kernel_sizes.reshape(-1,8)[k1][k2]
 # depth = depths_arch[depth_indexs.reshape(-1,8)[k1][k2]]
-# saving_folder = saving_folder + str(args.max_scale) +'/'
-# if not os.path.isdir(saving_folder):
-#     os.mkdir(saving_folder)
+saving_folder = saving_folder + str(cross_validation_index) +'/'
+if not os.path.isdir(saving_folder):
+    os.mkdir(saving_folder)
 # saving_folder = saving_folder + str(sum(depth)) + '_' + str(kernel_size) +'/'
 # if not os.path.isdir(saving_folder):
 #     os.mkdir(saving_folder)
@@ -86,5 +88,5 @@ optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,nesterov=True
 criterion = nn.CrossEntropyLoss()
 trainer = train.Trainer(model,training_loader,optimizer,criterion,test_loader=testing_loader,
                         verbose=False,saving_folder=saving_folder,nb_outputs=1)
-trainer.cross_validate_training(400,drop_learning_rate=[10,50,100,200],window_size=90,step=10)
+trainer.train(400,drop_learning_rate=[10,50,100,200])
 print(saving_folder)
