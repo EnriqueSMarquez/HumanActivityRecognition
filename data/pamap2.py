@@ -14,7 +14,14 @@ default_path = '/ssd/esm1g14/PAMAP2/'
 class PAMAP2_Dataset(HAR_dataset):
     def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
         super(PAMAP2_Dataset,self).__init__(datapath=datapath,dataset=dataset,transform=transform,target_transform=target_transform)
-        self.files = ['subject101.dat', 'subject102.dat','subject103.dat','subject104.dat', 'subject107.dat', 'subject108.dat', 'subject109.dat','subject106.dat']
+        self.files = ['subject101.dat', 
+                      'subject102.dat',
+                      'subject103.dat',
+                      'subject104.dat',
+                      'subject105.dat',
+                      'subject106.dat',
+                      'subject107.dat',
+                      'subject108.dat']
     def read_data(self,cross_validation_index=-1):
         files = self.files.copy()
         if self.dataset == 'training':
@@ -52,7 +59,7 @@ class PAMAP2_Dataset(HAR_dataset):
                 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
                ]
         self.data = self.read_files(files, cols, label2id)
-        self.id2Label = id2Label
+        self.id2label = id2label
         self.label2id = label2id
 
     def read_files(self, filelist, cols, label2id):

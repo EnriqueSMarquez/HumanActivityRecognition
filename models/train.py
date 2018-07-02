@@ -34,7 +34,7 @@ class Trainer():
             self.train(nb_epochs=nb_epochs,drop_learning_rate=drop_learning_rate,name='_index'+str(cross_validation_index))
     def train(self,nb_epochs,drop_learning_rate=[],name=''):
         print(('TRAINING MODEL WITH EPOCHS %d')%(nb_epochs))
-        best_loss = 100.
+        best_f1 = 0.
         starting_epoch = len(self.histories[0]['test_loss'])
         for epoch in range(starting_epoch,nb_epochs):
             if epoch in drop_learning_rate:
@@ -62,9 +62,10 @@ class Trainer():
                 print(('TESTING ACC : %.4f')%(history['test_acc'][-1]))
                 print(('TESTING F1 : %.4f')%(history['test_f1'][-1]))
             self.save_history(name=name)
-            # self.save_model(name=name)
-            if self.save_best and best_loss > self.history['test_loss'][-1]:
+            self.save_model(name=name)
+            if self.save_best and best_f1 < self.histories[0]['test_f1'][-1]:
                 self.save_model('best_')
+                best_f1 = self.histories[0]['test_f1'][-1]
     def train_epoch(self):
         total = 0.
         corrects = [0.]*self.nb_outputs
@@ -131,6 +132,7 @@ class Trainer():
         with open(self.saving_folder + 'history' + name + '.txt','wb') as fp:
             pickle.dump(self.histories,fp)
     def save_model(self,name=''):
+        print(('SAVING MODEL AT %s')%(self.saving_folder+'model' + name + '.pth.tar'))
         torch.save(self.model.state_dict(),self.saving_folder+'model' + name + '.pth.tar')
     def reset_history(self):
         self.histories = [{'test_acc'  : [],

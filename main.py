@@ -23,6 +23,9 @@ if dataset == 'opp':
 elif dataset == 'pamap2':
     from data import pamap2
     dataset = pamap2.PAMAP2_Dataset
+elif dataset == 'daph':
+    from data import daphnet
+    dataset = daphnet.DaphNet
 
 # depths_arch = [[[1,1],[1,3],[3,5],[5,7],[9,11],[11,15],[17,19]],
 #               [[2,3,4],[3,5,5],[5,7,7],[5,7,9],[7,9,9],[7,9,11],[11,13,15]],
@@ -32,10 +35,13 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run4_pamp2_CV_not_dilated/'
+saving_folder = './Run1_daph_CV_not_dilated/'
+#Run2_opp
 print(saving_folder)
+
 if not os.path.isdir(saving_folder):
     os.mkdir(saving_folder)
+print(saving_folder)
 # k1 = int(args.parallel_index1)
 # k2 = int(args.parallel_index2)
 input_transform = quick_transforms()
@@ -57,7 +63,7 @@ training_loader = torch.utils.data.DataLoader(  dataset=training_data,
                                             # sampler=training_sampler)
 testing_loader = torch.utils.data.DataLoader(  dataset=test_data,
                                             batch_size=32,  # specified batch size here
-                                            shuffle=False,
+                                            shuffle=True,
                                             num_workers=2,
                                             drop_last=True,  # drop the last batch that cannot be divided by batch_size
                                             pin_memory=True)
@@ -87,6 +93,6 @@ model = model.cuda()
 optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,nesterov=True,weight_decay=10.e-4)
 criterion = nn.CrossEntropyLoss()
 trainer = train.Trainer(model,training_loader,optimizer,criterion,test_loader=testing_loader,
-                        verbose=False,saving_folder=saving_folder,nb_outputs=1)
+                        verbose=True,saving_folder=saving_folder,nb_outputs=1,save_best=True)
 trainer.train(400,drop_learning_rate=[10,50,100,200])
 print(saving_folder)
