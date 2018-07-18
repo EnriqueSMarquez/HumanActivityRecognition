@@ -10,6 +10,8 @@ from scipy import stats
 from .dataset import HAR_dataset
 
 default_path = '/ssd/esm1g14/dataset_fog_release/'
+default_frequency = 60
+default_test_index = 1
 
 class DaphNet(HAR_dataset):
 	def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
@@ -24,7 +26,9 @@ class DaphNet(HAR_dataset):
 					 ['S08R01.txt'],
 					 ['S09R01.txt'],
 					 ['S10R01.txt']]
-	def read_data(self,cross_validation_index=-1):
+	def read_data(self,cross_validation_index=None,downsample=1):
+		if cross_validation_index == None:
+			cross_validation_index = default_test_index
 		files = self.files.copy()
 		if self.dataset == 'training':
 			files.pop(cross_validation_index)
@@ -39,6 +43,9 @@ class DaphNet(HAR_dataset):
 		cols = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 		# print "cols",cols
 		self.read_files(files, cols, self.label2id)
+		if downsample > 0:
+			self.data['inputs'] = self.data['inputs'][::downsample,:]
+			self.data['targets'] = self.data['targets'][::downsample]
 	def read_files(self, filelist, cols, label2id):
 		data = []
 		labels = []

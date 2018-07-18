@@ -10,12 +10,15 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--dataset', type=str, default='opp')
+parser.add_argument('--downsample_factor',type=int,default=1)
 # parser.add_argument('--max_scale',type=int,default=0)
 # parser.add_argument('--parallel_index1',type=int)
 parser.add_argument('--cross_validation_index',type=int)
+# parser.add_argument()
 # parser.add_argument('--parallel_index2',type=int)
 args = parser.parse_args()
 dataset = args.dataset
+downsample = int(args.downsample_factor)
 cross_validation_index = int(args.cross_validation_index)
 if dataset == 'opp':
     from data import opportunity
@@ -26,6 +29,10 @@ elif dataset == 'pamap2':
 elif dataset == 'daph':
     from data import daphnet
     dataset = daphnet.DaphNet
+elif dataset == 'hhar':
+    from data import hhar
+    dataset = hhar.HeterogeneityHumanActivityRecognition()
+    dataset.read_data()
 
 # depths_arch = [[[1,1],[1,3],[3,5],[5,7],[9,11],[11,15],[17,19]],
 #               [[2,3,4],[3,5,5],[5,7,7],[5,7,9],[7,9,9],[7,9,11],[11,13,15]],
@@ -35,7 +42,7 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run1_daph_CV_not_dilated/'
+saving_folder = './Run2_PAMAP2_CV/'
 #Run2_opp
 print(saving_folder)
 
@@ -49,8 +56,8 @@ target_transform = quick_transforms(type=torch.LongTensor)
 training_data = dataset(dataset='training',transform=input_transform,
                                         target_transform=target_transform)
 test_data = dataset(dataset='test',transform=input_transform,target_transform=target_transform)
-training_data.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
-test_data.build_data(window_size=90,step=10,cross_validation_index=cross_validation_index)
+training_data.build_data(window_size=90,step=10,downsample=downsample,cross_validation_index=cross_validation_index)
+test_data.build_data(window_size=90,step=10,downsample=downsample,cross_validation_index=cross_validation_index)
 # training_sampler = data.BalancedBatchSampler(labels=training_data.data['targets'])
 
 

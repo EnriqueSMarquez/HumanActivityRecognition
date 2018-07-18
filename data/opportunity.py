@@ -8,6 +8,8 @@ import torch
 from .dataset import HAR_dataset
 
 default_path = '/ssd/esm1g14/OpportunityUCIDataset/'
+default_frequency = 30
+default_test_indexes = ['S2-ADL4.dat','S2-ADL5.dat','S3-ADL4.dat','S3-ADL5.dat']
 
 class OpportunityDataset(HAR_dataset):
     def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
@@ -16,13 +18,20 @@ class OpportunityDataset(HAR_dataset):
                       ['S2-ADL1.dat', 'S2-ADL2.dat','S2-ADL3.dat', 'S2-ADL4.dat','S2-ADL5.dat', 'S2-Drill.dat'],
                       ['S3-ADL1.dat', 'S3-ADL2.dat','S3-ADL3.dat', 'S3-ADL4.dat','S3-ADL5.dat', 'S3-Drill.dat'],
                       ['S4-ADL1.dat', 'S4-ADL2.dat', 'S4-ADL3.dat', 'S4-ADL4.dat', 'S4-ADL5.dat', 'S4-Drill.dat']]
-    def read_data(self,cross_validation_index=-1):
+    def read_data(self,cross_validation_index=None,downsample=1):
         files = self.files.copy()
-        if self.dataset == 'training':
-            files.pop(cross_validation_index)
-            files = [item for sublist in files for item in sublist]
+        if cross_validation_index == None:
+            files = np.asarray(files).flatten().tolist()
+            if self.dataset == 'training':
+                [files.pop(files.index(i)) for i in default_test_indexes]
+            else:
+                files = [files.pop(files.index(i)) for i in default_test_indexes]
         else:
-            files = files.pop(cross_validation_index)
+            if self.dataset == 'training':
+                files.pop(cross_validation_index)
+                files = [item for sublist in files for item in sublist]
+            else:
+                files = files.pop(cross_validation_index)
 
         label_map = [
             (0,      'Other'),
@@ -54,7 +63,6 @@ class OpportunityDataset(HAR_dataset):
             110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124,
             125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 250]
         cols = [x-1 for x in cols] # labels for 18 activities (including other)
-
         self.read_files(files, cols, label2id)
         self.id2label = id2label
         self.label2id = label2id

@@ -11,13 +11,14 @@ import matplotlib.pyplot as plt
 import itertools
 
 class Tester():
-    def __init__(self,model,test_loader,criterion,verbose=False,saving_folder=None,nb_outputs=1):
+    def __init__(self,model,test_loader,criterion,verbose=False,saving_folder=None,nb_outputs=1,macro=False):
         self.model = model
         self.verbose = verbose
         self.test_loader = test_loader
         self.criterion = criterion
         self.saving_folder = saving_folder
         self.nb_outputs = nb_outputs
+        self.macro = macro
     def test(self,cm=False):
         total = 0.
         corrects = [0.]*self.nb_outputs
@@ -37,7 +38,9 @@ class Tester():
         if cm:
             cm = confusion_matrix(np.asarray(labels).flatten(),np.asarray(predicted).flatten())
             self.plot_confusion_matrix(cm,classes=self.test_loader.dataset.id2Label,normalize=False)
-        return running_losses,[correct/total for correct in corrects],np.mean(f1s,axis=0).tolist()
+        return {'loss' : running_losses,
+                'acc' : [correct/total for correct in corrects],
+                'f1' : np.mean(f1s,axis=0).tolist()}
     def test_batch(self,x,y):
         x = Variable(x).cuda()
         y = Variable(y).cuda().view(-1)
@@ -46,9 +49,12 @@ class Tester():
         predicts = [torch.max(out.data, 1)[1] for out in outs]
         # _,truth = torch.max(y.data,1)
         corrects = [(torch.max(out.data, 1)[1] == y.data).sum().item() for out in outs]
-        f1s = [f1_score(y.data.cpu().numpy().reshape(-1),
-                        predict.cpu().numpy().reshape(-1),average='weighted')
-               for predict in predicts]
+        if self.macro:
+            f1s = [f1_score(y.data.cpu().numpy().reshape(-1),
+                            predict.cpu().numpy().reshape(-1),average='macro') for predict in predicts]  
+        else: 
+            f1s = [f1_score(y.data.cpu().numpy().reshape(-1),
+                            predict.cpu().numpy().reshape(-1),average='weighted') for predict in predicts]
         return losses,corrects,f1s,predicts
     def plot_confusion_matrix(self,cm, classes,
                           normalize=False,

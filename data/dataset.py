@@ -8,8 +8,11 @@ class HAR_dataset():
         self.datapath = datapath
         self.transform = transform
         self.target_transform = target_transform
-    def build_data(self,window_size=30,step=10,cross_validation_index=-1):
-        self.read_data(cross_validation_index)
+    def build_data(self,window_size=30,step=10,cross_validation_index=None,downsample=1):
+        if cross_validation_index == None:
+            self.read_data(downsample=downsample)
+        else:
+            self.read_data(cross_validation_index=cross_validation_index,downsample=downsample)
         inputs = []
         targets = []
         counter = 0
