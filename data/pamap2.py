@@ -12,6 +12,7 @@ from .dataset import HAR_dataset
 default_path = '/ssd/esm1g14/PAMAP2/'
 default_frequency = 100
 default_test_index = 5
+heart_rate_index = 2
 
 class PAMAP2_Dataset(HAR_dataset):
     def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
@@ -24,6 +25,7 @@ class PAMAP2_Dataset(HAR_dataset):
                       'subject106.dat',
                       'subject107.dat',
                       'subject108.dat']
+        self.nb_classes = 13
     def read_data(self,cross_validation_index=default_test_index,downsample=1):
         files = self.files.copy()
         if self.dataset == 'training':
@@ -31,7 +33,7 @@ class PAMAP2_Dataset(HAR_dataset):
         else:
             files = [files.pop(cross_validation_index)]
         label_map = [
-            # (0, 'other'),
+            (0, 'other'),
             (1, 'lying'),
             (2, 'sitting'),
             (3, 'standing'),
@@ -61,6 +63,7 @@ class PAMAP2_Dataset(HAR_dataset):
                 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
                ]
         self.data = self.read_files(files, cols, label2id)
+        self.data['targets'] = np.asarray([int(label2id[str(i)]) for i in self.data['targets'].tolist()]).astype(int)
         if downsample > 0:
             self.data['inputs'] = self.data['inputs'][::downsample,:]
             self.data['targets'] = self.data['targets'][::downsample]
@@ -68,26 +71,21 @@ class PAMAP2_Dataset(HAR_dataset):
         self.id2label = id2label
         self.label2id = label2id
 
-    def read_files(self, filelist, cols, label2id):
+    def read_files(self, filelist, cols, label2id,interpolate_heart_rate=True):
         data = []
         labels = []
         for i, filename in enumerate(filelist):
-            with open(self.datapath+'Protocol/%s' % filename, 'r') as f:
-                #print "f",f
-                reader = csv.reader(f, delimiter=' ')
-                for line in reader:
-                    #print "line=",line
-                    elem = []
-                    #not including the non related activity
-                    if line[1] == "0":
-                        continue
-                    for ind in cols:
-                        elem.append(line[ind])
-                    if sum([x == 'NaN' for x in elem]) == 0:
-                        data.append([float(x) / 1000 for x in elem[1::]])
-                        labels.append(label2id[elem[0]])
+            current_data = pd.read_csv(self.datapath+'Protocol/%s' % filename,delimiter=' ')
+            if interpolate_heart_rate:
+                current_data.iloc[:,heart_rate_index] = current_data.iloc[:,heart_rate_index].interpolate()
+                # current_data.iloc[:,heart_rate_index] = current_data.iloc[:,heart_rate_index].dr('backfill')
+            # else:
+            current_data = current_data.dropna()
+            current_data = current_data.iloc[:,cols]
+            data.append(current_data.iloc[:,1::])
+            labels.append(current_data.iloc[:,0])
 
-        return {'inputs': np.asarray(data), 'targets': np.asarray(labels, dtype=int)}
+        return {'inputs': np.concatenate([np.asarray(i) for i in data]).astype(float), 'targets': np.concatenate([np.asarray(j) for j in labels]).astype(int)}
     def plot_data(self,saving_folder):
         if not os.path.isdir(saving_folder):
             os.mkdir(saving_folder)

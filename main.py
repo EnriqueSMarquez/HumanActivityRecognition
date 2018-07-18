@@ -11,6 +11,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--dataset', type=str, default='opp')
 parser.add_argument('--downsample_factor',type=int,default=1)
+# parser.add_argument('--dilated',type=bool)
 # parser.add_argument('--max_scale',type=int,default=0)
 # parser.add_argument('--parallel_index1',type=int)
 parser.add_argument('--cross_validation_index',type=int)
@@ -56,6 +57,7 @@ target_transform = quick_transforms(type=torch.LongTensor)
 training_data = dataset(dataset='training',transform=input_transform,
                                         target_transform=target_transform)
 test_data = dataset(dataset='test',transform=input_transform,target_transform=target_transform)
+nb_classes = training_data.nb_classes
 training_data.build_data(window_size=90,step=10,downsample=downsample,cross_validation_index=cross_validation_index)
 test_data.build_data(window_size=90,step=10,downsample=downsample,cross_validation_index=cross_validation_index)
 # training_sampler = data.BalancedBatchSampler(labels=training_data.data['targets'])
@@ -87,7 +89,7 @@ if not os.path.isdir(saving_folder):
 # saving_folder = saving_folder + str(sum(depth)) + '_' + str(kernel_size) +'/'
 # if not os.path.isdir(saving_folder):
 #     os.mkdir(saving_folder)
-model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=15,depth=[3,4,4,5],dilated=False)
+model = resnets.HAR_ResNet1D(input_channels=training_data.data['inputs'].shape[1],kernel_size=15,depth=[3,4,4,5],dilated=False,nb_classes=nb_classes)
 x = Variable(next(iter(training_loader))[0])
 print('Batch shape')
 print(x.shape)
