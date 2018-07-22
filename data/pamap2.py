@@ -26,7 +26,7 @@ class PAMAP2_Dataset(HAR_dataset):
                       'subject107.dat',
                       'subject108.dat']
         self.nb_classes = 13
-    def read_data(self,cross_validation_index=default_test_index,downsample=1):
+    def read_data(self,cross_validation_index=default_test_index,downsample=1,chop_non_related_activities=True):
         files = self.files.copy()
         if self.dataset == 'training':
             files.pop(cross_validation_index)
@@ -67,7 +67,17 @@ class PAMAP2_Dataset(HAR_dataset):
         if downsample > 0:
             self.data['inputs'] = self.data['inputs'][::downsample,:]
             self.data['targets'] = self.data['targets'][::downsample]
-
+        if chop_non_related_activities:
+            tmp = {'inputs' : [],'targets': []}
+            for x,y in zip(self.data['inputs'],self.data['targets']):
+                if int(y) != 0:
+                    tmp['inputs'] += [x]
+                    tmp['targets'] += [y]
+            tmp['inputs'] = np.asarray(tmp['inputs'])
+            tmp['targets'] = np.asarray(tmp['targets'])
+            tmp['targets'] -= 1
+            self.nb_classes -= 1
+        self.data = tmp
         self.id2label = id2label
         self.label2id = label2id
 

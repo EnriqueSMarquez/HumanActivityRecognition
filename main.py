@@ -43,12 +43,8 @@ def quick_transforms(type=torch.FloatTensor):
     def f(x):
         return torch.from_numpy(x).type(type)
     return f
-saving_folder = './Run2_PAMAP2_CV/'
+saving_folder = './Run5_PAMAP2_benchmark_not_dilated/'
 #Run2_opp
-print(saving_folder)
-
-if not os.path.isdir(saving_folder):
-    os.mkdir(saving_folder)
 print(saving_folder)
 # k1 = int(args.parallel_index1)
 # k2 = int(args.parallel_index2)
@@ -64,7 +60,7 @@ test_data.build_data(window_size=90,step=10,downsample=downsample,cross_validati
 
 
 training_loader = torch.utils.data.DataLoader(  dataset=training_data,
-                                            batch_size=32,  # specified batch size here
+                                            batch_size=64,  # specified batch size here
                                             num_workers=2,
                                             drop_last=True,
                                             shuffle=True,  # drop the last batch that cannot be divided by batch_size
@@ -99,9 +95,9 @@ print(x.shape)
 model.build_classifier(x)
 model = model.cuda()
 # optimizer = torch.optim.Adam(model.parameters(),weight_decay=10.e-4)
-optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,nesterov=True,weight_decay=10.e-4)
+optimizer = torch.optim.SGD(model.parameters(),lr=0.1,momentum=0.9,nesterov=True,weight_decay=10.e-5)
 criterion = nn.CrossEntropyLoss()
 trainer = train.Trainer(model,training_loader,optimizer,criterion,test_loader=testing_loader,
-                        verbose=True,saving_folder=saving_folder,nb_outputs=1,save_best=True)
+                        verbose=False,saving_folder=saving_folder,nb_outputs=1,save_best=True)
 trainer.train(400,drop_learning_rate=[10,50,100,200])
 print(saving_folder)
