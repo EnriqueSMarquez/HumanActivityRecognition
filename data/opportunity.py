@@ -12,27 +12,15 @@ default_frequency = 30
 default_test_indexes = ['S2-ADL4.dat','S2-ADL5.dat','S3-ADL4.dat','S3-ADL5.dat']
 
 class OpportunityDataset(HAR_dataset):
-    def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
-        super(OpportunityDataset,self).__init__(datapath=datapath,dataset=dataset,transform=transform,target_transform=target_transform)
-        self.files = [['S1-ADL1.dat','S1-ADL2.dat','S1-ADL3.dat', 'S1-ADL4.dat', 'S1-ADL5.dat', 'S1-Drill.dat'],
+    def __init__(self,subjects,datapath=default_path,transform=None,target_transform=None):
+        super(OpportunityDataset,self).__init__(datapath=datapath,transform=transform,target_transform=target_transform)
+        self.files = np.asarray([['S1-ADL1.dat','S1-ADL2.dat','S1-ADL3.dat', 'S1-ADL4.dat', 'S1-ADL5.dat', 'S1-Drill.dat'],
                       ['S2-ADL1.dat', 'S2-ADL2.dat','S2-ADL3.dat', 'S2-ADL4.dat','S2-ADL5.dat', 'S2-Drill.dat'],
                       ['S3-ADL1.dat', 'S3-ADL2.dat','S3-ADL3.dat', 'S3-ADL4.dat','S3-ADL5.dat', 'S3-Drill.dat'],
-                      ['S4-ADL1.dat', 'S4-ADL2.dat', 'S4-ADL3.dat', 'S4-ADL4.dat', 'S4-ADL5.dat', 'S4-Drill.dat']]
-    def read_data(self,cross_validation_index=None,downsample=1):
+                      ['S4-ADL1.dat', 'S4-ADL2.dat', 'S4-ADL3.dat', 'S4-ADL4.dat', 'S4-ADL5.dat', 'S4-Drill.dat']])
+        self.files = [self.files[i,j] for i,j in subjects]
+    def read_data(self,downsample=1):
         files = self.files.copy()
-        if cross_validation_index == None:
-            files = np.asarray(files).flatten().tolist()
-            if self.dataset == 'training':
-                [files.pop(files.index(i)) for i in default_test_indexes]
-            else:
-                files = [files.pop(files.index(i)) for i in default_test_indexes]
-        else:
-            if self.dataset == 'training':
-                files.pop(cross_validation_index)
-                files = [item for sublist in files for item in sublist]
-            else:
-                files = files.pop(cross_validation_index)
-
         label_map = [
             (0,      'Other'),
             (406516, 'Open Door 1'),
@@ -66,25 +54,20 @@ class OpportunityDataset(HAR_dataset):
         self.read_files(files, cols, label2id)
         self.id2label = id2label
         self.label2id = label2id
-    def read_files(self, filelist, cols, label2id,verbose=False):
+        if downsample > 1 and downsample != 0:
+            self.data['inputs'] = self.data['inputs'][::downsample,:]
+            self.data['targets'] = self.data['targets'][::downsample]
+    def read_files(self, filelist, cols, label2id):
         data = []
         labels = []
-        print(('LOADING %s DATA')%(self.dataset))
-        print('FILES TO LOAD')
-        print(filelist)
-        if verbose:
-            filelist = tqdm(filelist)
         for i, filename in enumerate(filelist):
             nancnt = 0
-            # print('reading file %d of %d' % (i+1, len(filelist)))
             with open(self.datapath.rstrip('/') + '/dataset/%s' % filename, 'r') as f:
                 reader = csv.reader(f, delimiter=' ')
                 for line in reader:
                     elem = []
                     for ind in cols:
                         elem.append(line[ind])
-                    # we can skip lines that contain NaNs, as they occur in blocks at the start
-                    # and end of the recordings.
                     if sum([x == 'NaN' for x in elem]) == 0:
                         data.append([float(x) / 1000 for x in elem[:-1]])
                         labels.append(label2id[elem[-1]])

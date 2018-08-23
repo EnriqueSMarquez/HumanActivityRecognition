@@ -1,18 +1,15 @@
 import numpy as np
 import torch
 from scipy import stats
+import pandas as pd
 
 class HAR_dataset():
-    def __init__(self, datapath,dataset,transform,target_transform):
-        self.dataset = dataset
+    def __init__(self, datapath,transform,target_transform):
         self.datapath = datapath
         self.transform = transform
         self.target_transform = target_transform
-    def build_data(self,window_size=30,step=10,cross_validation_index=None,downsample=1):
-        if cross_validation_index == None:
-            self.read_data(downsample=downsample)
-        else:
-            self.read_data(cross_validation_index=cross_validation_index,downsample=downsample)
+    def build_data(self,window_size=30,step=10,downsample=1):
+        self.read_data(downsample=downsample)
         inputs = []
         targets = []
         counter = 0
@@ -23,16 +20,12 @@ class HAR_dataset():
             counter += step
         self.data = {'inputs': np.asarray(inputs).transpose(0,2,1), 'targets': np.asarray(targets, dtype=int)}
     def __getitem__(self,index):
-        x,y = self.data['inputs'][index],self.data['targets'][index].reshape(1,-1)
-        if self.transform:
-            x = self.transform(x)
-        if self.target_transform:
-            y = self.target_transform(y)
+        x,y = self.transform(self.data['inputs'][index]),self.target_transform(self.data['targets'][index].reshape(1,-1))
         return x,y
     def input_shape(self):
         return self.data['inputs'].shape[1::]
     def nb_classes(self):
-        return max(self.data['targets'])+1
+        return int(max(self.data['targets'])+1)
     def __len__(self):
         return len(self.data['inputs'])
     def get_data_weights(self):

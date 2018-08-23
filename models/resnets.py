@@ -56,7 +56,6 @@ class Bottleneck1D(nn.Module):
 
     def forward(self, x):
         residual = x
-        # we do pre-activation
         out = self.relu(self.bn1(x))
         out = self.conv1(out)
 
@@ -83,7 +82,6 @@ class ResNet1D(nn.Module):
         self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
         mid_layers = []
         mid_layers += self._make_layer(block, 64, layers[0]) #32
         channels = first_channels
@@ -104,12 +102,6 @@ class ResNet1D(nn.Module):
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
-            # downsample = nn.Sequential(
-            #     nn.Conv2d(self.inplanes, planes * block.expansion,
-            #               kernel_size=1, stride=stride),
-            #     nn.BatchNorm2d(planes * block.expansion),
-            # )
-
             downsample = nn.Conv1d(self.inplanes, planes * block.expansion,
                               kernel_size=1, stride=stride)
         layers = []
@@ -143,7 +135,6 @@ class Dilated_ResNet1D(nn.Module):
         self.conv1 = nn.Conv1d(input_channels, channels, kernel_size=self.kernel_size, stride=1, padding=(self.kernel_size-1)/2)
         self.bn1 = nn.BatchNorm1d(channels)
         self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
         mid_layers = []
         mid_layers += self._make_layer(block, channels, layers[0],dilation=1) #32
         dilation = 1
@@ -193,7 +184,6 @@ class HAR_ResNet1D_AuxOuts(nn.Module):
     def __init__(self,depth=56,kernel_size=3,input_channels=30,nb_classes=18,outputs=3):
         super(HAR_ResNet1D_AuxOuts,self).__init__()
         self.encoder = resnet_encoder(depth,kernel_size=kernel_size,input_channels=input_channels,return_multiple_outputs=True)
-        #INCREASE 16, ADD AVERGA POOLING LAYER
         self.last_compressions = [nn.Sequential(nn.BatchNorm1d(int(256*self.encoder.expansion/2**i)),nn.ReLU())]
         self.last_compressions = nn.ModuleList(self.last_compressions)
         self.nb_classes = nb_classes

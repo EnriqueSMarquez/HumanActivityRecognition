@@ -12,11 +12,12 @@ from .dataset import HAR_dataset
 default_path = '/ssd/esm1g14/PAMAP2/'
 default_frequency = 100
 default_test_index = 5
-heart_rate_index = 2
+heart_rate_index = [2]
+acc16_indexes = [4,5,6,21,22,23,38,39,40]
 
 class PAMAP2_Dataset(HAR_dataset):
-    def __init__(self, datapath=default_path,dataset='training',transform=None,target_transform=None):
-        super(PAMAP2_Dataset,self).__init__(datapath=datapath,dataset=dataset,transform=transform,target_transform=target_transform)
+    def __init__(self, subjects,datapath=default_path,transform=None,target_transform=None):
+        super(PAMAP2_Dataset,self).__init__(datapath=datapath,transform=transform,target_transform=target_transform)
         self.files = ['subject101.dat', 
                       'subject102.dat',
                       'subject103.dat',
@@ -25,13 +26,9 @@ class PAMAP2_Dataset(HAR_dataset):
                       'subject106.dat',
                       'subject107.dat',
                       'subject108.dat']
-        self.nb_classes = 13
-    def read_data(self,cross_validation_index=default_test_index,downsample=1,chop_non_related_activities=True):
+        self.files = [self.files[i] for i in subjects]
+    def read_data(self,downsample=1,chop_non_related_activities=True,trim_activities=True):
         files = self.files.copy()
-        if self.dataset == 'training':
-            files.pop(cross_validation_index)
-        else:
-            files = [files.pop(cross_validation_index)]
         label_map = [
             (0, 'other'),
             (1, 'lying'),
@@ -55,18 +52,10 @@ class PAMAP2_Dataset(HAR_dataset):
         ]
 
         label2id = {str(x[0]): i for i, x in enumerate(label_map)}
-        # print "label2id=",labelToId
         id2label = [x[1] for x in label_map]
-        # print "id2label=",idToLabel
-        cols = [
-                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34,
-                35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
-               ]
+        cols = [1] + heart_rate_index + acc16_indexes
         self.data = self.read_files(files, cols, label2id)
         self.data['targets'] = np.asarray([int(label2id[str(i)]) for i in self.data['targets'].tolist()]).astype(int)
-        if downsample > 0:
-            self.data['inputs'] = self.data['inputs'][::downsample,:]
-            self.data['targets'] = self.data['targets'][::downsample]
         if chop_non_related_activities:
             tmp = {'inputs' : [],'targets': []}
             for x,y in zip(self.data['inputs'],self.data['targets']):
@@ -76,8 +65,12 @@ class PAMAP2_Dataset(HAR_dataset):
             tmp['inputs'] = np.asarray(tmp['inputs'])
             tmp['targets'] = np.asarray(tmp['targets'])
             tmp['targets'] -= 1
-            self.nb_classes -= 1
         self.data = tmp
+        if trim_activities:
+            self.trim_activities()
+        if downsample > 1:
+            self.data['inputs'] = self.data['inputs'][::downsample,:]
+            self.data['targets'] = self.data['targets'][::downsample]
         self.id2label = id2label
         self.label2id = label2id
 
@@ -88,13 +81,11 @@ class PAMAP2_Dataset(HAR_dataset):
             current_data = pd.read_csv(self.datapath+'Protocol/%s' % filename,delimiter=' ')
             if interpolate_heart_rate:
                 current_data.iloc[:,heart_rate_index] = current_data.iloc[:,heart_rate_index].interpolate()
-                # current_data.iloc[:,heart_rate_index] = current_data.iloc[:,heart_rate_index].dr('backfill')
-            # else:
+
             current_data = current_data.dropna()
             current_data = current_data.iloc[:,cols]
             data.append(current_data.iloc[:,1::])
             labels.append(current_data.iloc[:,0])
-
         return {'inputs': np.concatenate([np.asarray(i) for i in data]).astype(float), 'targets': np.concatenate([np.asarray(j) for j in labels]).astype(int)}
     def plot_data(self,saving_folder):
         if not os.path.isdir(saving_folder):
@@ -103,3 +94,25 @@ class PAMAP2_Dataset(HAR_dataset):
             plt.figure()
             plt.plot(time_series)
             plt.savefig(saving_folder+'time_series' + str(i)+'.png')
+
+    def trim_activities(self):
+        inputs = []
+        targets = []
+        trimmed_inputs = []
+        trimmed_targets =[]
+        for x,y in zip(self.data['inputs'],self.data['targets']):
+            if len(targets) == 0:
+                targets += [y]
+                inputs += [x]
+            else:
+                if targets[-1] != y:
+                    trimmed_inputs += [inputs[1000:-1000]]
+                    trimmed_targets += [targets[1000:-1000]]
+                    targets = []
+                    inputs = []
+                else:
+                    targets += [y]
+                    inputs += [x]
+        self.data['inputs'] = np.concatenate(trimmed_inputs)
+        self.data['targets'] = np.concatenate(trimmed_targets)
+

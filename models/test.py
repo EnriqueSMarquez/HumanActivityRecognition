@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import itertools
 
 class Tester():
-    def __init__(self,model,test_loader,criterion,verbose=False,saving_folder=None,nb_outputs=1,macro=False):
+    def __init__(self,model,test_loader,id2label,criterion,verbose=False,saving_folder=None,nb_outputs=1,macro=False):
         self.model = model
         self.verbose = verbose
         self.test_loader = test_loader
@@ -19,6 +19,7 @@ class Tester():
         self.saving_folder = saving_folder
         self.nb_outputs = nb_outputs
         self.macro = macro
+        self.id2label = id2label
     def test(self,cm=False):
         total = 0.
         corrects = [0.]*self.nb_outputs
@@ -37,13 +38,13 @@ class Tester():
             f1s += [batch_f1s]
         if cm:
             cm = confusion_matrix(np.asarray(labels).flatten(),np.asarray(predicted).flatten())
-            self.plot_confusion_matrix(cm,classes=self.test_loader.dataset.id2Label,normalize=False)
+            self.plot_confusion_matrix(cm,classes=self.id2label,normalize=True)
         return {'loss' : running_losses,
                 'acc' : [correct/total for correct in corrects],
                 'f1' : np.mean(f1s,axis=0).tolist()}
     def test_batch(self,x,y):
-        x = Variable(x).cuda()
-        y = Variable(y).cuda().view(-1)
+        x = x.cuda()
+        y = y.cuda().view(-1)
         outs = self.model(x)
         losses = [self.criterion(out, y) for out in outs]
         predicts = [torch.max(out.data, 1)[1] for out in outs]
@@ -72,13 +73,15 @@ class Tester():
         plt.title(title)
         plt.colorbar()
         tick_marks = np.arange(len(classes))
-        plt.xticks(tick_marks, classes, rotation=45)
-        plt.yticks(tick_marks, classes)
+        plt.xticks(tick_marks, [value for value in classes.values()], rotation=90)
+        plt.yticks(tick_marks, [value for value in classes.values()])
 
-        fmt = '.2f' if normalize else 'd'
+        fmt = '.1f' if normalize else 'd'
         thresh = cm.max() / 2.
         for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
             plt.text(j, i, format(cm[i, j], fmt),
                      horizontalalignment="center",
                      color="white" if cm[i, j] > thresh else "black")
-        plt.savefig(self.saving_folder + 'confusion_matrix_not_normalized.png',bbox_inches='tight')
+        plt.tight_layout()
+        np.set_printoptions(precision=2)
+        plt.savefig(os.path.join(self.saving_folder, 'confusion_matrix.png'),bbox_inches='tight')
